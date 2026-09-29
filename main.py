@@ -9,6 +9,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from aiohttp import web
 
 load_dotenv()
 
@@ -17,6 +18,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", 0))
 DB_PATH = os.getenv("DB_PATH", "confessions.db")
+PORT = int(os.getenv("PORT", 8080))
 
 # --- БАЗА ДАННЫХ ---
 async def init_db():
@@ -274,10 +276,25 @@ async def ban_author(callback: types.CallbackQuery, bot: Bot):
         except Exception:
             pass
 
+# --- ВЕБ-СЕРВЕР ДЛЯ РЕНДЕРА ---
+async def handle_ping(request):
+    return web.Response(text="Bot is alive!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle_ping)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', PORT)
+    await site.start()
+
 # --- ЗАПУСК ---
 async def main():
     logging.basicConfig(level=logging.INFO)
     await init_db()
+    
+    # Запускаем фоновый веб-сервер для проверки от Render
+    await start_web_server()
     
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
